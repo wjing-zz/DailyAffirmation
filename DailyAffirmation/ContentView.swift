@@ -39,7 +39,13 @@ enum Language: String, CaseIterable {
 struct Quote: Decodable, Encodable {
     let chinese: String
     let english: String
-    var sentToUniverse: Bool? = false // 修改为可选类型并提供默认值
+    var sentToUniverse: Bool? = false
+}
+
+// MARK: - UniverseReply Struct
+struct UniverseReply: Decodable, Encodable {
+    let chinese: String
+    let english: String
 }
 
 // MARK: - ViewState Enum for screen control
@@ -62,6 +68,7 @@ enum LocalizedText {
     case sendToUniverse
     case universeReceivedMessage
     case universeReceivedCard
+    case universeReplyReceived
     case resetAppData
     case fileNotFound
     case failedToLoad
@@ -78,7 +85,8 @@ enum LocalizedText {
         case .done: return "完成"
         case .sendToUniverse: return "发送给宇宙"
         case .universeReceivedMessage: return "宇宙已收到，祝你拥有愉快的一天。"
-        case .universeReceivedCard: return "宇宙已收到今日卡片："
+        case .universeReceivedCard: return "宇宙收到今日卡片："
+        case .universeReplyReceived: return "宇宙回信："
         case .resetAppData: return "重置应用数据（仅测试用）"
         case .fileNotFound: return "文件未找到"
         case .failedToLoad: return "加载失败"
@@ -98,6 +106,7 @@ enum LocalizedText {
         case .sendToUniverse: return "Send to Universe"
         case .universeReceivedMessage: return "Universe received! Have a wonderful day."
         case .universeReceivedCard: return "Universe received today's card:"
+        case .universeReplyReceived: return "Universe Reply:"
         case .resetAppData: return "Reset App Data (for testing)"
         case .fileNotFound: return "File not found"
         case .failedToLoad: return "Failed to load"
@@ -121,6 +130,7 @@ struct ContentView: View {
     
     @State private var backgroundColor: Color = Color(hex: "#c1cbd7")
     @State private var currentQuote: Quote?
+    @State private var universeReply: UniverseReply?
     
     @State private var selectedLanguage: Language = {
         if let savedLanguageRawValue = UserDefaults.standard.string(forKey: "selectedLanguage"),
@@ -151,12 +161,28 @@ struct ContentView: View {
                 let quotes = try JSONDecoder().decode([Quote].self, from: data)
                 self.currentQuote = quotes.randomElement()
             } catch {
-                print("Error loading or decoding JSON: \(error)")
+                print("Error loading or decoding quotes.json: \(error)")
                 self.currentQuote = Quote(chinese: LocalizedText.failedToLoad.chinese, english: LocalizedText.failedToLoad.english)
             }
         } else {
             print("Could not find quotes.json in main bundle.")
             self.currentQuote = Quote(chinese: LocalizedText.fileNotFound.chinese, english: LocalizedText.fileNotFound.english)
+        }
+    }
+    
+    func loadUniverseReply() -> UniverseReply? {
+        if let url = Bundle.main.url(forResource: "universe_replies", withExtension: "json") {
+            do {
+                let data = try Data(contentsOf: url)
+                let replies = try JSONDecoder().decode([UniverseReply].self, from: data)
+                return replies.randomElement()
+            } catch {
+                print("Error loading or decoding universe_replies.json: \(error)")
+                return nil
+            }
+        } else {
+            print("Could not find universe_replies.json in main bundle.")
+            return nil
         }
     }
     
@@ -173,6 +199,10 @@ struct ContentView: View {
                     
                     if savedQuote.sentToUniverse ?? false {
                         self.viewState = .universeReceived
+                        if let savedReplyData = UserDefaults.standard.data(forKey: "universeReply"),
+                           let savedReply = try? JSONDecoder().decode(UniverseReply.self, from: savedReplyData) {
+                            self.universeReply = savedReply
+                        }
                     } else {
                         self.viewState = .content
                     }
@@ -193,6 +223,10 @@ struct ContentView: View {
             UserDefaults.standard.set(encoded, forKey: "dailyQuote")
             UserDefaults.standard.set(Date(), forKey: "lastDrawDate")
         }
+        
+        if let reply = universeReply, let encodedReply = try? JSONEncoder().encode(reply) {
+            UserDefaults.standard.set(encodedReply, forKey: "universeReply")
+        }
     }
     
     func startInitialAnimation() {
@@ -200,6 +234,7 @@ struct ContentView: View {
         self.cardOpacity = 1.0
         self.cardOffset = .zero
         self.cardScale = 1.0
+        self.universeReply = nil
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             withAnimation { showTitle = true }
@@ -326,6 +361,11 @@ struct ContentView: View {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                 currentQuote?.sentToUniverse = true
                                 saveDailyAffirmation()
+                                
+                                if Int.random(in: 1...100) <= 20 {
+                                    self.universeReply = loadUniverseReply()
+                                }
+                                
                                 withAnimation(.easeIn(duration: 0.8)) {
                                     viewState = .universeReceived
                                 }
@@ -347,42 +387,65 @@ struct ContentView: View {
                 
                 if viewState == .universeReceived {
                     VStack(spacing: 20) {
-                        Text(LocalizedText.universeReceivedCard.localizedString(for: selectedLanguage))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        VStack(spacing: 15) {
-                            if let quote = currentQuote {
-                                switch selectedLanguage {
-                                case .chinese:
-                                    Text(quote.chinese)
-                                        .font(.title)
-                                        .fontWeight(.bold)
-                                        .padding(.horizontal)
-                                case .english:
-                                    Text(quote.english)
-                                        .font(.title)
-                                        .fontWeight(.bold)
-                                        .padding(.horizontal)
-                                case .bilingual:
-                                    VStack(spacing: 15) {
+                        if universeReply != nil {
+                            Text(LocalizedText.universeReplyReceived.localizedString(for: selectedLanguage))
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            VStack(spacing: 15) {
+                                Text(universeReply?.chinese ?? "")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .padding(.horizontal)
+                                Text(universeReply?.english ?? "")
+                                    .font(.headline)
+                                    .padding(.top, 5)
+                                    .padding(.horizontal)
+                            }
+                            .foregroundColor(.black)
+                            .multilineTextAlignment(.center)
+                            .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
+                            .background(Color.yellow.opacity(0.8))
+                            .cornerRadius(15)
+                            .shadow(radius: 10)
+                        } else {
+                            Text(LocalizedText.universeReceivedCard.localizedString(for: selectedLanguage))
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            VStack(spacing: 15) {
+                                if let quote = currentQuote {
+                                    switch selectedLanguage {
+                                    case .chinese:
                                         Text(quote.chinese)
                                             .font(.title)
                                             .fontWeight(.bold)
+                                            .padding(.horizontal)
+                                    case .english:
                                         Text(quote.english)
-                                            .font(.headline)
-                                            .padding(.top, 5)
+                                            .font(.title)
+                                            .fontWeight(.bold)
+                                            .padding(.horizontal)
+                                    case .bilingual:
+                                        VStack(spacing: 15) {
+                                            Text(quote.chinese)
+                                                .font(.title)
+                                                .fontWeight(.bold)
+                                            Text(quote.english)
+                                                .font(.headline)
+                                                .padding(.top, 5)
+                                        }
+                                        .padding(.horizontal)
                                     }
-                                    .padding(.horizontal)
                                 }
                             }
+                            .foregroundColor(.black)
+                            .multilineTextAlignment(.center)
+                            .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
+                            .background(Color.white.opacity(0.4))
+                            .cornerRadius(15)
+                            .shadow(radius: 10)
                         }
-                        .foregroundColor(.black)
-                        .multilineTextAlignment(.center)
-                        .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
-                        .background(Color.white.opacity(0.4))
-                        .cornerRadius(15)
-                        .shadow(radius: 10)
                         
                         Text(LocalizedText.universeReceivedMessage.localizedString(for: selectedLanguage))
                             .font(.headline)
@@ -395,8 +458,9 @@ struct ContentView: View {
             }
             .overlay(alignment: .topTrailing) {
                 HStack {
+                    
 //                    if viewState == .content || viewState == .universeReceived {
-//                        Picker(LocalizedText.dailyAffirmationTitle.english, selection: $selectedLanguage) {
+//                        Picker("", selection: $selectedLanguage) {
 //                            ForEach(Language.allCases, id: \.self) { language in
 //                                Text(language.rawValue).tag(language)
 //                            }
@@ -404,7 +468,7 @@ struct ContentView: View {
 //                        .pickerStyle(.menu)
 //                        .padding(.top, geometry.safeAreaInsets.top)
 //                    }
-//                    
+                    
                     Button(action: {
                         showSettings.toggle()
                     }) {

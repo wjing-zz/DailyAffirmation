@@ -35,7 +35,7 @@ enum Language: String, CaseIterable {
 }
 
 // MARK: - Quote Struct
-struct Quote: Decodable {
+struct Quote: Decodable, Encodable { // 增加了Encodable以便存储到UserDefaults
     let chinese: String
     let english: String
 }
@@ -54,7 +54,6 @@ struct ContentView: View {
     @State private var backgroundColor: Color = Color(hex: "#c1cbd7")
     @State private var currentQuote: Quote?
     
-    // 使用didSet和UserDefaults来持久化语言选择
     @State private var selectedLanguage: Language = {
         if let savedLanguageRawValue = UserDefaults.standard.string(forKey: "selectedLanguage"),
            let savedLanguage = Language(rawValue: savedLanguageRawValue) {
@@ -90,6 +89,53 @@ struct ContentView: View {
         }
     }
     
+    // 新增函数来加载或生成每日一念
+    func getDailyAffirmation() {
+        let today = Calendar.current.startOfDay(for: Date())
+        
+        if let lastDrawDate = UserDefaults.standard.object(forKey: "lastDrawDate") as? Date {
+            let lastDrawDay = Calendar.current.startOfDay(for: lastDrawDate)
+            
+            if today == lastDrawDay {
+                // 如果是同一天，加载已保存的语录
+                if let savedQuoteData = UserDefaults.standard.data(forKey: "dailyQuote"),
+                   let savedQuote = try? JSONDecoder().decode(Quote.self, from: savedQuoteData) {
+                    self.currentQuote = savedQuote
+                    self.viewState = .content
+                }
+            } else {
+                // 如果是新的一天，执行动画序列
+                startInitialAnimation()
+            }
+        } else {
+            // 如果从未抽取过，执行动画序列
+            startInitialAnimation()
+        }
+    }
+    
+    // 新增函数来保存今天的语录和日期
+    func saveDailyAffirmation() {
+        guard let quote = currentQuote else { return }
+        if let encoded = try? JSONEncoder().encode(quote) {
+            UserDefaults.standard.set(encoded, forKey: "dailyQuote")
+            UserDefaults.standard.set(Date(), forKey: "lastDrawDate")
+        }
+    }
+    
+    // 启动初始动画
+    func startInitialAnimation() {
+        self.viewState = .initial
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation { showTitle = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation { showPrompt = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation { showButton = true }
+        }
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -113,6 +159,9 @@ struct ContentView: View {
                         .animation(.easeOut(duration: 0.8).delay(0.4), value: showPrompt)
                     
                     Button(action: {
+                        loadQuotes() // 在抽取时加载新的语录
+                        saveDailyAffirmation() // 保存新抽取的语录
+                        
                         // 按钮点击后，隐藏初始屏幕，并显示内容
                         withAnimation(.easeOut(duration: 0.4)) {
                             showTitle = false
@@ -135,9 +184,10 @@ struct ContentView: View {
                     }
                     .opacity(showButton ? 1 : 0)
                     .animation(.easeOut(duration: 0.8).delay(0.8), value: showButton)
+                    .disabled(viewState != .initial) // 只有在初始状态下按钮才可点击
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .opacity(viewState == .initial ? 1 : 0) // 根据状态控制整个VStack的可见性
+                .opacity(viewState == .initial ? 1 : 0)
                 
                 // 主要内容屏幕
                 VStack(spacing: 15) {
@@ -177,11 +227,10 @@ struct ContentView: View {
                 .background(Color.white.opacity(0.8))
                 .cornerRadius(15)
                 .shadow(radius: 10)
-                .opacity(viewState == .content ? 1 : 0) // 根据状态控制整个VStack的可见性
+                .opacity(viewState == .content ? 1 : 0)
                 .animation(.easeIn(duration: 0.8), value: viewState)
             }
             .overlay(alignment: .topTrailing) {
-                // 语言选择器作为叠加层，不受主视图布局影响
                 if viewState == .content {
                     Picker("Language", selection: $selectedLanguage) {
                         ForEach(Language.allCases, id: \.self) { language in
@@ -191,31 +240,14 @@ struct ContentView: View {
                     .pickerStyle(.menu)
                     .padding(.top, geometry.safeAreaInsets.top)
                     .padding(.trailing, 20)
-                    .transition(.opacity) // 切换时带有淡入淡出效果
+                    .transition(.opacity)
                 }
             }
             .onAppear {
-                // 在视图加载时启动动画序列
                 if let randomHex = colors.randomElement() {
                     self.backgroundColor = Color(hex: randomHex)
                 }
-                loadQuotes()
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation {
-                        showTitle = true
-                    }
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    withAnimation {
-                        showPrompt = true
-                    }
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation {
-                        showButton = true
-                    }
-                }
+                getDailyAffirmation() // 在视图出现时，决定加载或生成新的语录
             }
         }
     }

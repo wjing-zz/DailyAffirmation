@@ -4,7 +4,8 @@ import UserNotifications
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     
-    @Binding var selectedLanguage: Language // 接收 ContentView 传递的语言状态
+    @Binding var selectedLanguage: Language
+    var resetAction: () -> Void
     
     @State private var selectedTime: Date = {
         if let savedTime = UserDefaults.standard.object(forKey: "reminderTime") as? Date {
@@ -32,12 +33,15 @@ struct SettingsView: View {
                 .foregroundColor(.white)
                 .cornerRadius(10)
                 
-                // test button
-                Button("Reset App Data (for testing)") {
-                    resetUserDefaults()
+                // 重置按钮
+                Button(LocalizedText.resetAppData.localizedString(for: selectedLanguage)) {
+                    resetAction()
+                    dismiss()
                 }
                 .padding()
-                .foregroundColor(.red)
+                .background(Color.red)
+                .foregroundColor(.white)
+                .cornerRadius(10)
                 
                 Spacer()
             }
@@ -90,7 +94,6 @@ struct SettingsView_Previews: PreviewProvider {
     @State static var selectedLanguage: Language = .chinese
     
     static var previews: some View {
-        SettingsView(selectedLanguage: $selectedLanguage)
+        SettingsView(selectedLanguage: $selectedLanguage, resetAction: {})
     }
 }
-

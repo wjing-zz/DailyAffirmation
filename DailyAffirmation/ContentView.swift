@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 // MARK: - Color Extension for Hex values
 extension Color {
@@ -35,7 +36,7 @@ enum Language: String, CaseIterable {
 }
 
 // MARK: - Quote Struct
-struct Quote: Decodable, Encodable { // 增加了Encodable以便存储到UserDefaults
+struct Quote: Decodable, Encodable {
     let chinese: String
     let english: String
 }
@@ -46,11 +47,58 @@ enum ViewState {
     case content
 }
 
+// MARK: - LocalizedText Enum
+enum LocalizedText {
+    case dailyAffirmationTitle
+    case dailyAffirmationPrompt
+    case drawButton
+    case loading
+    case settingsTitle
+    case setReminderTime
+    case saveReminder
+    case done
+    
+    var chinese: String {
+        switch self {
+        case .dailyAffirmationTitle: return "每日一念"
+        case .dailyAffirmationPrompt: return "深呼吸，抽出今日一念"
+        case .drawButton: return "抽"
+        case .loading: return "加载中..."
+        case .settingsTitle: return "提醒设置"
+        case .setReminderTime: return "设置每日提醒时间"
+        case .saveReminder: return "保存提醒"
+        case .done: return "完成"
+        }
+    }
+    
+    var english: String {
+        switch self {
+        case .dailyAffirmationTitle: return "Daily Affirmation"
+        case .dailyAffirmationPrompt: return "Take a deep breath and draw your daily affirmation"
+        case .drawButton: return "Draw"
+        case .loading: return "Loading..."
+        case .settingsTitle: return "Reminder Settings"
+        case .setReminderTime: return "Set Daily Reminder Time"
+        case .saveReminder: return "Save Reminder"
+        case .done: return "Done"
+        }
+    }
+    
+    func localizedString(for language: Language) -> String {
+        switch language {
+        case .chinese, .bilingual: return self.chinese
+        case .english: return self.english
+        }
+    }
+    
+    func bilingualString() -> (String, String) {
+        return (self.chinese, self.english)
+    }
+}
+
 struct ContentView: View {
-    // 你提供的颜色列表
     let colors = ["#c1cbd7", "#afb0b2", "#939391", "#bfbfbf", "#e0e5df"]
     
-    // 状态变量
     @State private var backgroundColor: Color = Color(hex: "#c1cbd7")
     @State private var currentQuote: Quote?
     
@@ -59,20 +107,19 @@ struct ContentView: View {
            let savedLanguage = Language(rawValue: savedLanguageRawValue) {
             return savedLanguage
         }
-        return .chinese // 默认语言
+        return .chinese
     }() {
         didSet {
             UserDefaults.standard.set(selectedLanguage.rawValue, forKey: "selectedLanguage")
         }
     }
     
-    // 新增状态变量来控制视图的显示阶段
     @State private var viewState: ViewState = .initial
     @State private var showTitle: Bool = false
     @State private var showPrompt: Bool = false
     @State private var showButton: Bool = false
+    @State private var showSettings: Bool = false
     
-    // 一个函数用来从JSON文件加载数据
     func loadQuotes() {
         if let url = Bundle.main.url(forResource: "quotes", withExtension: "json") {
             do {
@@ -89,7 +136,6 @@ struct ContentView: View {
         }
     }
     
-    // 新增函数来加载或生成每日一念
     func getDailyAffirmation() {
         let today = Calendar.current.startOfDay(for: Date())
         
@@ -97,23 +143,19 @@ struct ContentView: View {
             let lastDrawDay = Calendar.current.startOfDay(for: lastDrawDate)
             
             if today == lastDrawDay {
-                // 如果是同一天，加载已保存的语录
                 if let savedQuoteData = UserDefaults.standard.data(forKey: "dailyQuote"),
                    let savedQuote = try? JSONDecoder().decode(Quote.self, from: savedQuoteData) {
                     self.currentQuote = savedQuote
                     self.viewState = .content
                 }
             } else {
-                // 如果是新的一天，执行动画序列
                 startInitialAnimation()
             }
         } else {
-            // 如果从未抽取过，执行动画序列
             startInitialAnimation()
         }
     }
     
-    // 新增函数来保存今天的语录和日期
     func saveDailyAffirmation() {
         guard let quote = currentQuote else { return }
         if let encoded = try? JSONEncoder().encode(quote) {
@@ -122,7 +164,6 @@ struct ContentView: View {
         }
     }
     
-    // 启动初始动画
     func startInitialAnimation() {
         self.viewState = .initial
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -139,30 +180,27 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // 背景层
                 backgroundColor
                     .ignoresSafeArea()
                 
-                // 初始屏幕
                 VStack(spacing: 30) {
-                    Text("每日一念")
+                    Text(LocalizedText.dailyAffirmationTitle.localizedString(for: selectedLanguage))
                         .font(.largeTitle)
                         .fontWeight(.heavy)
                         .scaleEffect(showTitle ? 1.0 : 0.8)
                         .opacity(showTitle ? 1 : 0)
                         .animation(.easeOut(duration: 0.8), value: showTitle)
                     
-                    Text("深呼吸，抽出今日一念")
+                    Text(LocalizedText.dailyAffirmationPrompt.localizedString(for: selectedLanguage))
                         .font(.title3)
                         .scaleEffect(showPrompt ? 1.0 : 0.8)
                         .opacity(showPrompt ? 1 : 0)
                         .animation(.easeOut(duration: 0.8).delay(0.4), value: showPrompt)
                     
                     Button(action: {
-                        loadQuotes() // 在抽取时加载新的语录
-                        saveDailyAffirmation() // 保存新抽取的语录
+                        loadQuotes()
+                        saveDailyAffirmation()
                         
-                        // 按钮点击后，隐藏初始屏幕，并显示内容
                         withAnimation(.easeOut(duration: 0.4)) {
                             showTitle = false
                             showPrompt = false
@@ -174,7 +212,7 @@ struct ContentView: View {
                             }
                         }
                     }) {
-                        Text("抽")
+                        Text(LocalizedText.drawButton.localizedString(for: selectedLanguage))
                             .font(.title)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
@@ -184,12 +222,11 @@ struct ContentView: View {
                     }
                     .opacity(showButton ? 1 : 0)
                     .animation(.easeOut(duration: 0.8).delay(0.8), value: showButton)
-                    .disabled(viewState != .initial) // 只有在初始状态下按钮才可点击
+                    .disabled(viewState != .initial)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .opacity(viewState == .initial ? 1 : 0)
                 
-                // 主要内容屏幕
                 VStack(spacing: 15) {
                     if let quote = currentQuote {
                         switch selectedLanguage {
@@ -215,7 +252,7 @@ struct ContentView: View {
                             .padding(.horizontal)
                         }
                     } else {
-                        Text("加载中...")
+                        Text(LocalizedText.loading.localizedString(for: selectedLanguage))
                             .font(.title)
                             .fontWeight(.bold)
                             .padding(.horizontal)
@@ -231,26 +268,50 @@ struct ContentView: View {
                 .animation(.easeIn(duration: 0.8), value: viewState)
             }
             .overlay(alignment: .topTrailing) {
-                if viewState == .content {
-                    Picker("Language", selection: $selectedLanguage) {
-                        ForEach(Language.allCases, id: \.self) { language in
-                            Text(language.rawValue).tag(language)
+                HStack {
+                    // 语言选择器
+                    if viewState == .content {
+                        Picker(LocalizedText.dailyAffirmationTitle.english, selection: $selectedLanguage) {
+                            ForEach(Language.allCases, id: \.self) { language in
+                                Text(language.rawValue).tag(language)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .padding(.top, geometry.safeAreaInsets.top)
                     }
-                    .pickerStyle(.menu)
-                    .padding(.top, geometry.safeAreaInsets.top)
+                    
+                    // 设置按钮
+                    Button(action: {
+                        showSettings.toggle()
+                    }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title2)
+                            .foregroundColor(.black)
+                            .padding(.top, geometry.safeAreaInsets.top)
+                    }
                     .padding(.trailing, 20)
-                    .transition(.opacity)
                 }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView(selectedLanguage: $selectedLanguage)
             }
             .onAppear {
                 if let randomHex = colors.randomElement() {
                     self.backgroundColor = Color(hex: randomHex)
                 }
-                getDailyAffirmation() // 在视图出现时，决定加载或生成新的语录
+                getDailyAffirmation()
             }
         }
     }
+}
+
+func resetUserDefaults() {
+    let defaults = UserDefaults.standard
+    let dictionary = defaults.dictionaryRepresentation()
+    dictionary.keys.forEach { key in
+        defaults.removeObject(forKey: key)
+    }
+    print("UserDefaults has been reset.")
 }
 
 #Preview {

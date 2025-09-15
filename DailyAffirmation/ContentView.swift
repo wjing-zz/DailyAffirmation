@@ -40,6 +40,12 @@ struct Quote: Decodable {
     let english: String
 }
 
+// MARK: - ViewState Enum for screen control
+enum ViewState {
+    case initial
+    case content
+}
+
 struct ContentView: View {
     // 你提供的颜色列表
     let colors = ["#c1cbd7", "#afb0b2", "#939391", "#bfbfbf", "#e0e5df"]
@@ -60,6 +66,12 @@ struct ContentView: View {
             UserDefaults.standard.set(selectedLanguage.rawValue, forKey: "selectedLanguage")
         }
     }
+    
+    // 新增状态变量来控制视图的显示阶段
+    @State private var viewState: ViewState = .initial
+    @State private var showTitle: Bool = false
+    @State private var showPrompt: Bool = false
+    @State private var showButton: Bool = false
     
     // 一个函数用来从JSON文件加载数据
     func loadQuotes() {
@@ -85,23 +97,49 @@ struct ContentView: View {
                 backgroundColor
                     .ignoresSafeArea()
                 
-                // 语言选择下拉菜单
-                VStack {
-                    HStack {
-                        Spacer()
-                        Picker("Language", selection: $selectedLanguage) {
-                            ForEach(Language.allCases, id: \.self) { language in
-                                Text(language.rawValue).tag(language)
+                // 初始屏幕
+                VStack(spacing: 30) {
+                    Text("每日一念")
+                        .font(.largeTitle)
+                        .fontWeight(.heavy)
+                        .scaleEffect(showTitle ? 1.0 : 0.8)
+                        .opacity(showTitle ? 1 : 0)
+                        .animation(.easeOut(duration: 0.8), value: showTitle)
+                    
+                    Text("深呼吸，抽出今日一念")
+                        .font(.title3)
+                        .scaleEffect(showPrompt ? 1.0 : 0.8)
+                        .opacity(showPrompt ? 1 : 0)
+                        .animation(.easeOut(duration: 0.8).delay(0.4), value: showPrompt)
+                    
+                    Button(action: {
+                        // 按钮点击后，隐藏初始屏幕，并显示内容
+                        withAnimation(.easeOut(duration: 0.4)) {
+                            showTitle = false
+                            showPrompt = false
+                            showButton = false
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            withAnimation(.easeOut(duration: 0.8)) {
+                                viewState = .content
                             }
                         }
-                        .pickerStyle(.menu)
-                        .padding(.top, geometry.safeAreaInsets.top)
-                        .padding(.trailing, 20)
+                    }) {
+                        Text("抽")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .frame(width: 100, height: 100)
+                            .background(Color.black.opacity(0.8))
+                            .clipShape(Circle())
                     }
-                    Spacer()
+                    .opacity(showButton ? 1 : 0)
+                    .animation(.easeOut(duration: 0.8).delay(0.8), value: showButton)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(viewState == .initial ? 1 : 0) // 根据状态控制整个VStack的可见性
                 
-                // 中间白色区域和文字
+                // 主要内容屏幕
                 VStack(spacing: 15) {
                     if let quote = currentQuote {
                         switch selectedLanguage {
@@ -139,12 +177,45 @@ struct ContentView: View {
                 .background(Color.white.opacity(0.8))
                 .cornerRadius(15)
                 .shadow(radius: 10)
+                .opacity(viewState == .content ? 1 : 0) // 根据状态控制整个VStack的可见性
+                .animation(.easeIn(duration: 0.8), value: viewState)
+            }
+            .overlay(alignment: .topTrailing) {
+                // 语言选择器作为叠加层，不受主视图布局影响
+                if viewState == .content {
+                    Picker("Language", selection: $selectedLanguage) {
+                        ForEach(Language.allCases, id: \.self) { language in
+                            Text(language.rawValue).tag(language)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding(.top, geometry.safeAreaInsets.top)
+                    .padding(.trailing, 20)
+                    .transition(.opacity) // 切换时带有淡入淡出效果
+                }
             }
             .onAppear {
+                // 在视图加载时启动动画序列
                 if let randomHex = colors.randomElement() {
                     self.backgroundColor = Color(hex: randomHex)
                 }
                 loadQuotes()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation {
+                        showTitle = true
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    withAnimation {
+                        showPrompt = true
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation {
+                        showButton = true
+                    }
+                }
             }
         }
     }

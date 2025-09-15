@@ -371,7 +371,7 @@ struct ContentView: View {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                 currentQuote?.sentToUniverse = true
                                 
-                                if Int.random(in: 1...100) <= 100 {
+                                if Int.random(in: 1...100) <= 20 {
                                     self.universeReply = loadUniverseReply()
                                 }
                                 saveDailyAffirmation()
@@ -488,15 +488,15 @@ struct ContentView: View {
             }
             .overlay(alignment: .topTrailing) {
                 HStack {
-                    if viewState == .content || viewState == .universeReceived {
-                        Picker("", selection: $selectedLanguage) {
-                            ForEach(Language.allCases, id: \.self) { language in
-                                Text(language.rawValue).tag(language)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .padding(.top, geometry.safeAreaInsets.top)
-                    }
+//                    if viewState == .content || viewState == .universeReceived {
+//                        Picker("", selection: $selectedLanguage) {
+//                            ForEach(Language.allCases, id: \.self) { language in
+//                                Text(language.rawValue).tag(language)
+//                            }
+//                        }
+//                        .pickerStyle(.menu)
+//                        .padding(.top, geometry.safeAreaInsets.top)
+//                    }
                     
                     Button(action: {
                         showSettings.toggle()

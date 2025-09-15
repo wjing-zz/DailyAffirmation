@@ -47,7 +47,19 @@ struct ContentView: View {
     // 状态变量
     @State private var backgroundColor: Color = Color(hex: "#c1cbd7")
     @State private var currentQuote: Quote?
-    @State private var selectedLanguage: Language = .chinese
+    
+    // 使用didSet和UserDefaults来持久化语言选择
+    @State private var selectedLanguage: Language = {
+        if let savedLanguageRawValue = UserDefaults.standard.string(forKey: "selectedLanguage"),
+           let savedLanguage = Language(rawValue: savedLanguageRawValue) {
+            return savedLanguage
+        }
+        return .chinese // 默认语言
+    }() {
+        didSet {
+            UserDefaults.standard.set(selectedLanguage.rawValue, forKey: "selectedLanguage")
+        }
+    }
     
     // 一个函数用来从JSON文件加载数据
     func loadQuotes() {
@@ -97,23 +109,28 @@ struct ContentView: View {
                             Text(quote.chinese)
                                 .font(.title)
                                 .fontWeight(.bold)
+                                .padding(.horizontal)
                         case .english:
                             Text(quote.english)
                                 .font(.title)
                                 .fontWeight(.bold)
+                                .padding(.horizontal)
                         case .bilingual:
-                            Text(quote.chinese)
-                                .font(.title)
-                                .fontWeight(.bold)
-                            Text(quote.english)
-                                .font(.headline)
-                                .padding(.top, 5)
-                                .multilineTextAlignment(.center)
+                            VStack(spacing: 15) {
+                                Text(quote.chinese)
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                Text(quote.english)
+                                    .font(.headline)
+                                    .padding(.top, 5)
+                            }
+                            .padding(.horizontal)
                         }
                     } else {
                         Text("加载中...")
                             .font(.title)
                             .fontWeight(.bold)
+                            .padding(.horizontal)
                     }
                 }
                 .foregroundColor(.black)

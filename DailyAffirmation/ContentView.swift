@@ -154,9 +154,9 @@ struct ContentView: View {
     @State private var cardOffset: CGSize = .zero
     @State private var cardScale: CGFloat = 1.0
     
-    // 新增状态变量用于卡片翻转
+    // MARK: - Change [1/4]: Renamed for clarity, true shows reply, false shows original quote.
     @State private var cardRotation: Double = 0
-    @State private var showQuoteCard: Bool = true
+    @State private var showReplyCard: Bool = true
     
     func loadQuotes() {
         if let url = Bundle.main.url(forResource: "quotes", withExtension: "json") {
@@ -240,8 +240,9 @@ struct ContentView: View {
         self.cardOffset = .zero
         self.cardScale = 1.0
         self.universeReply = nil
-        self.cardRotation = 0 // 重置旋转状态
-//        self.showQuoteCard = true // 重置翻转状态
+        self.cardRotation = 0
+        // MARK: - Change [2/4]: Reset flip state
+        self.showReplyCard = true
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             withAnimation { showTitle = true }
@@ -369,11 +370,11 @@ struct ContentView: View {
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                 currentQuote?.sentToUniverse = true
-                                saveDailyAffirmation()
                                 
-                                if Int.random(in: 1...100) <= 20 { // 恢复正常概率
+                                if Int.random(in: 1...100) <= 100 {
                                     self.universeReply = loadUniverseReply()
                                 }
+                                saveDailyAffirmation()
                                 
                                 withAnimation(.easeIn(duration: 0.8)) {
                                     viewState = .universeReceived
@@ -397,36 +398,74 @@ struct ContentView: View {
                 // MARK: - 宇宙已收到页面 (可翻转卡片)
                 if viewState == .universeReceived {
                     VStack(spacing: 20) {
-                        Text(showQuoteCard ? LocalizedText.universeReceivedCard.localizedString(for: selectedLanguage) : LocalizedText.universeReplyReceived.localizedString(for: selectedLanguage))
+                        // MARK: - Change [3/4]: Logic to show correct title
+                        Text(showReplyCard && universeReply != nil ? LocalizedText.universeReplyReceived.localizedString(for: selectedLanguage) : LocalizedText.universeReceivedCard.localizedString(for: selectedLanguage))
                             .font(.title2)
                             .fontWeight(.bold)
                             .opacity(currentQuote?.sentToUniverse ?? false ? 1 : 0)
                         
-                        ZStack {
-                            // 原始卡片 (正面)
+                        // MARK: - Change [4/4]: Major logic change for flipping
+                        if universeReply != nil {
+                            ZStack {
+                                // 原始卡片 (反面)
+                                VStack(spacing: 15) {
+                                    if let quote = currentQuote {
+                                        switch selectedLanguage {
+                                        case .chinese:
+                                            Text(quote.chinese).font(.title).fontWeight(.bold).padding(.horizontal)
+                                        case .english:
+                                            Text(quote.english).font(.title).fontWeight(.bold).padding(.horizontal)
+                                        case .bilingual:
+                                            VStack(spacing: 15) {
+                                                Text(quote.chinese).font(.title).fontWeight(.bold)
+                                                Text(quote.english).font(.headline).padding(.top, 5)
+                                            }.padding(.horizontal)
+                                        }
+                                    }
+                                }
+                                .foregroundColor(.black)
+                                .multilineTextAlignment(.center)
+                                .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
+                                .background(Color.white.opacity(0.4))
+                                .cornerRadius(15)
+                                .shadow(radius: 10)
+                                .rotation3DEffect(.degrees(cardRotation - 180), axis: (x: 0, y: 1, z: 0))
+                                .opacity(showReplyCard ? 0 : 1)
+                                
+                                // 宇宙回信卡片 (正面)
+                                VStack(spacing: 15) {
+                                    Text(universeReply?.chinese ?? "").font(.title).fontWeight(.bold).padding(.horizontal)
+                                    Text(universeReply?.english ?? "").font(.headline).padding(.top, 5).padding(.horizontal)
+                                }
+                                .foregroundColor(.black)
+                                .multilineTextAlignment(.center)
+                                .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
+                                .background(Color.yellow.opacity(0.8))
+                                .cornerRadius(15)
+                                .shadow(radius: 10)
+                                .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0))
+                                .opacity(showReplyCard ? 1 : 0)
+                            }
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.6)) {
+                                    cardRotation += 180
+                                    showReplyCard.toggle()
+                                }
+                            }
+                        } else {
+                            // If no reply, just show the original card statically
                             VStack(spacing: 15) {
                                 if let quote = currentQuote {
                                     switch selectedLanguage {
                                     case .chinese:
-                                        Text(quote.chinese)
-                                            .font(.title)
-                                            .fontWeight(.bold)
-                                            .padding(.horizontal)
+                                        Text(quote.chinese).font(.title).fontWeight(.bold).padding(.horizontal)
                                     case .english:
-                                        Text(quote.english)
-                                            .font(.title)
-                                            .fontWeight(.bold)
-                                            .padding(.horizontal)
+                                        Text(quote.english).font(.title).fontWeight(.bold).padding(.horizontal)
                                     case .bilingual:
                                         VStack(spacing: 15) {
-                                            Text(quote.chinese)
-                                                .font(.title)
-                                                .fontWeight(.bold)
-                                            Text(quote.english)
-                                                .font(.headline)
-                                                .padding(.top, 5)
-                                        }
-                                        .padding(.horizontal)
+                                            Text(quote.chinese).font(.title).fontWeight(.bold)
+                                            Text(quote.english).font(.headline).padding(.top, 5)
+                                        }.padding(.horizontal)
                                     }
                                 }
                             }
@@ -436,36 +475,6 @@ struct ContentView: View {
                             .background(Color.white.opacity(0.4))
                             .cornerRadius(15)
                             .shadow(radius: 10)
-                            .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0))
-                            .opacity(showQuoteCard ? 1 : 0)
-                            
-                            // 宇宙回信卡片 (反面)
-                            if universeReply != nil {
-                                VStack(spacing: 15) {
-                                    Text(universeReply?.chinese ?? "")
-                                        .font(.title)
-                                        .fontWeight(.bold)
-                                        .padding(.horizontal)
-                                    Text(universeReply?.english ?? "")
-                                        .font(.headline)
-                                        .padding(.top, 5)
-                                        .padding(.horizontal)
-                                }
-                                .foregroundColor(.black)
-                                .multilineTextAlignment(.center)
-                                .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
-                                .background(Color.yellow.opacity(0.8))
-                                .cornerRadius(15)
-                                .shadow(radius: 10)
-                                .rotation3DEffect(.degrees(cardRotation - 180), axis: (x: 0, y: 1, z: 0))
-                                .opacity(showQuoteCard ? 0 : 1)
-                            }
-                        }
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.6)) {
-                                cardRotation += 180
-                                showQuoteCard.toggle()
-                            }
                         }
                         
                         Text(LocalizedText.universeReceivedMessage.localizedString(for: selectedLanguage))

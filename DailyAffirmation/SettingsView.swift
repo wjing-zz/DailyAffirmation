@@ -29,7 +29,7 @@ struct SettingsView: View {
                     saveReminder()
                 }
                 .padding()
-                .background(Color.blue)
+                .background(Color.black) // 修改为黑色
                 .foregroundColor(.white)
                 .cornerRadius(10)
                 
@@ -39,7 +39,7 @@ struct SettingsView: View {
                     dismiss()
                 }
                 .padding()
-                .background(Color.red)
+                .background(Color.black) // 修改为黑色
                 .foregroundColor(.white)
                 .cornerRadius(10)
                 
@@ -53,6 +53,7 @@ struct SettingsView: View {
                     Button(LocalizedText.done.localizedString(for: selectedLanguage)) {
                         dismiss()
                     }
+                    .tint(.black) // 改变导航栏按钮的颜色
                 }
             }
         }

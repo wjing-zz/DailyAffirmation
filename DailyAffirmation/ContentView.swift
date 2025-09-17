@@ -129,9 +129,9 @@ struct ContentView: View {
 //    let colors = ["#c1cbd7", "#afb0b2", "#939391", "#bfbfbf", "#e0e5df"]
     
     // 渐变颜色，固定下来，不再是随机色
-    let backgroundColor1 = Color(hex: "#e8fefd")
-    let backgroundColor2 = Color(hex: "#d6e8ff")
-    let backgroundEndColor = Color(hex: "#fcfdff")
+    let backgroundColor1 = Color(hex: "#b5c4b1")
+    let backgroundColor2 = Color(hex: "#e0e5df")
+    let backgroundEndColor = Color(hex: "#fcfffc")
     
     @State private var backgroundColor: Color = Color(hex: "#c1cbd7")
     @State private var currentQuote: Quote?
@@ -295,14 +295,13 @@ struct ContentView: View {
                 // MARK: - 初始屏幕
                 VStack(spacing: 30) {
                     Text(LocalizedText.dailyAffirmationTitle.localizedString(for: selectedLanguage))
-                        .font(.largeTitle)
-                        .fontWeight(.heavy)
+                        .customFont(size: 36, weight: .heavy)
                         .scaleEffect(showTitle ? 1.0 : 0.8)
                         .opacity(showTitle ? 1 : 0)
                         .animation(.easeOut(duration: 0.8), value: showTitle)
                     
                     Text(LocalizedText.dailyAffirmationPrompt.localizedString(for: selectedLanguage))
-                        .font(.title3)
+                        .customFont(size: 20)
                         .scaleEffect(showPrompt ? 1.0 : 0.8)
                         .opacity(showPrompt ? 1 : 0)
                         .animation(.easeOut(duration: 0.8).delay(0.4), value: showPrompt)
@@ -324,8 +323,7 @@ struct ContentView: View {
                         }
                     }) {
                         Text(LocalizedText.drawButton.localizedString(for: selectedLanguage))
-                            .font(.title)
-                            .fontWeight(.bold)
+                            .customFont(size: 24, weight: .heavy)
                             .foregroundColor(.white)
                             .frame(width: 100, height: 100)
                             .background(Color.black.opacity(0.8))
@@ -346,29 +344,26 @@ struct ContentView: View {
                                 switch selectedLanguage {
                                 case .chinese:
                                     Text(quote.chinese)
-                                        .font(.title)
-                                        .fontWeight(.bold)
+                                        .customFont(size: 24, weight: .heavy)
                                         .padding(.horizontal)
                                 case .english:
                                     Text(quote.english)
-                                        .font(.title)
-                                        .fontWeight(.bold)
+                                        .customFont(size: 24, weight: .heavy)
                                         .padding(.horizontal)
                                 case .bilingual:
                                     VStack(spacing: 15) {
                                         Text(quote.chinese)
-                                            .font(.title)
-                                            .fontWeight(.bold)
+                                            .customFont(size: 24, weight: .heavy)
                                         Text(quote.english)
-                                            .font(.headline)
+                                            .customFont(size: 20)
                                             .padding(.top, 5)
                                     }
                                     .padding(.horizontal)
                                 }
                             } else {
                                 Text(LocalizedText.loading.localizedString(for: selectedLanguage))
-                                    .font(.title)
-                                    .fontWeight(.bold)
+                                    .customFont(size: 24)
+                                    .fontWeight(.heavy)
                                     .padding(.horizontal)
                             }
                         }
@@ -376,8 +371,8 @@ struct ContentView: View {
                         .multilineTextAlignment(.center)
                         .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
                         .background(Color.white.opacity(cardOpacity))
-                        .cornerRadius(15)
-                        .shadow(radius: 10)
+//                        .cornerRadius(15)
+                        .shadow(radius: 5)
                         .offset(cardOffset)
                         .scaleEffect(cardScale)
                         
@@ -391,7 +386,7 @@ struct ContentView: View {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                 currentQuote?.sentToUniverse = true
                                 
-                                if Int.random(in: 1...100) <= 20 {
+                                if Int.random(in: 1...100) <= 50 {
                                     self.universeReply = loadUniverseReply()
                                 }
                                 saveDailyAffirmation()
@@ -402,12 +397,12 @@ struct ContentView: View {
                             }
                         }) {
                             Text(LocalizedText.sendToUniverse.localizedString(for: selectedLanguage))
-                                .font(.headline)
+                                .customFont(size: 20)
                                 .foregroundColor(.white)
                                 .padding(.vertical, 10)
                                 .padding(.horizontal, 20)
-                                .background(Color.purple.opacity(0.8))
-                                .cornerRadius(10)
+                                .background(Color(hex: "#7b8b6f"))
+//                                .cornerRadius(10)
                         }
                         .transition(.opacity)
                     }
@@ -420,7 +415,7 @@ struct ContentView: View {
                     VStack(spacing: 20) {
                         // MARK: - Change [3/4]: Logic to show correct title
                         Text(showReplyCard && universeReply != nil ? LocalizedText.universeReplyReceived.localizedString(for: selectedLanguage) : LocalizedText.universeReceivedCard.localizedString(for: selectedLanguage))
-                            .font(.title2)
+                            .customFont(size: 20)
                             .fontWeight(.bold)
                             .opacity(currentQuote?.sentToUniverse ?? false ? 1 : 0)
                         
@@ -432,13 +427,13 @@ struct ContentView: View {
                                     if let quote = currentQuote {
                                         switch selectedLanguage {
                                         case .chinese:
-                                            Text(quote.chinese).font(.title).fontWeight(.bold).padding(.horizontal)
+                                            Text(quote.chinese).customFont(size: 24, weight: .heavy).padding(.horizontal)
                                         case .english:
-                                            Text(quote.english).font(.title).fontWeight(.bold).padding(.horizontal)
+                                            Text(quote.english).customFont(size: 24, weight: .heavy).padding(.horizontal)
                                         case .bilingual:
                                             VStack(spacing: 15) {
-                                                Text(quote.chinese).font(.title).fontWeight(.bold)
-                                                Text(quote.english).font(.headline).padding(.top, 5)
+                                                Text(quote.chinese).customFont(size: 24, weight: .heavy)
+                                                Text(quote.english).customFont(size: 20).padding(.top, 5)
                                             }.padding(.horizontal)
                                         }
                                     }
@@ -447,22 +442,22 @@ struct ContentView: View {
                                 .multilineTextAlignment(.center)
                                 .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
                                 .background(Color.white.opacity(0.4))
-                                .cornerRadius(15)
-                                .shadow(radius: 10)
+//                                .cornerRadius(15)
+                                .shadow(radius: 5)
                                 .rotation3DEffect(.degrees(cardRotation - 180), axis: (x: 0, y: 1, z: 0))
                                 .opacity(showReplyCard ? 0 : 1)
                                 
                                 // 宇宙回信卡片 (正面)
                                 VStack(spacing: 15) {
-                                    Text(universeReply?.chinese ?? "").font(.title).fontWeight(.bold).padding(.horizontal)
-                                    Text(universeReply?.english ?? "").font(.headline).padding(.top, 5).padding(.horizontal)
+                                    Text(universeReply?.chinese ?? "").customFont(size: 24, weight: .heavy).padding(.horizontal)
+                                    Text(universeReply?.english ?? "").customFont(size: 20).padding(.top, 5).padding(.horizontal)
                                 }
                                 .foregroundColor(.black)
                                 .multilineTextAlignment(.center)
                                 .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
                                 .background(Color.yellow.opacity(0.8))
-                                .cornerRadius(15)
-                                .shadow(radius: 10)
+//                                .cornerRadius(15)
+                                .shadow(radius: 5)
                                 .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0))
                                 .opacity(showReplyCard ? 1 : 0)
                             }
@@ -478,13 +473,13 @@ struct ContentView: View {
                                 if let quote = currentQuote {
                                     switch selectedLanguage {
                                     case .chinese:
-                                        Text(quote.chinese).font(.title).fontWeight(.bold).padding(.horizontal)
+                                        Text(quote.chinese).customFont(size: 24, weight: .heavy).padding(.horizontal)
                                     case .english:
-                                        Text(quote.english).font(.title).fontWeight(.bold).padding(.horizontal)
+                                        Text(quote.english).customFont(size: 24, weight: .heavy).padding(.horizontal)
                                     case .bilingual:
                                         VStack(spacing: 15) {
-                                            Text(quote.chinese).font(.title).fontWeight(.bold)
-                                            Text(quote.english).font(.headline).padding(.top, 5)
+                                            Text(quote.chinese).customFont(size: 24, weight: .heavy)
+                                            Text(quote.english).customFont(size: 20).padding(.top, 5)
                                         }.padding(.horizontal)
                                     }
                                 }
@@ -493,12 +488,12 @@ struct ContentView: View {
                             .multilineTextAlignment(.center)
                             .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
                             .background(Color.white.opacity(0.4))
-                            .cornerRadius(15)
-                            .shadow(radius: 10)
+//                            .cornerRadius(15)
+                            .shadow(radius: 5)
                         }
                         
                         Text(LocalizedText.universeReceivedMessage.localizedString(for: selectedLanguage))
-                            .font(.headline)
+                            .customFont(size: 20)
                             .multilineTextAlignment(.center)
                             .padding(.top, 10)
                     }
@@ -522,7 +517,7 @@ struct ContentView: View {
                         showSettings.toggle()
                     }) {
                         Image(systemName: "gearshape.fill")
-                            .font(.title2)
+                            .customFont(size: 20)
                             .foregroundColor(.black)
                             .padding(.top, geometry.safeAreaInsets.top)
                     }

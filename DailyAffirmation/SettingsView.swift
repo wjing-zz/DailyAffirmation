@@ -31,7 +31,7 @@ struct SettingsView: View {
                 .padding()
                 .background(Color.black) // 修改为黑色
                 .foregroundColor(.white)
-                .cornerRadius(10)
+//                .cornerRadius(10)
                 
                 // 重置按钮
                 Button(LocalizedText.resetAppData.localizedString(for: selectedLanguage)) {
@@ -41,7 +41,7 @@ struct SettingsView: View {
                 .padding()
                 .background(Color.black) // 修改为黑色
                 .foregroundColor(.white)
-                .cornerRadius(10)
+                //.cornerRadius(10)
                 
                 Spacer()
             }

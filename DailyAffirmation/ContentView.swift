@@ -72,6 +72,10 @@ enum LocalizedText {
     case resetAppData
     case fileNotFound
     case failedToLoad
+    case saveToCollection
+    case collectionTitle
+    case maxCollectionReminder
+    case collectionIsEmpty
     
     var chinese: String {
         switch self {
@@ -90,6 +94,10 @@ enum LocalizedText {
         case .resetAppData: return "重置应用数据（仅测试用）"
         case .fileNotFound: return "文件未找到"
         case .failedToLoad: return "加载失败"
+        case .saveToCollection: return "收藏"
+        case .collectionTitle: return "我的收藏"
+        case .maxCollectionReminder: return "你已收藏 %d 张卡片，本地存储最多支持保存 1000 张。"
+        case .collectionIsEmpty: return "收藏夹是空的，去抽卡吧！"
         }
     }
     
@@ -110,6 +118,10 @@ enum LocalizedText {
         case .resetAppData: return "Reset App Data (for testing)"
         case .fileNotFound: return "File not found"
         case .failedToLoad: return "Failed to load"
+        case .saveToCollection: return "Save to Collection"
+        case .collectionTitle: return "My Collection"
+        case .maxCollectionReminder: return "You have collected %d cards. The local storage supports up to 1000 cards."
+        case .collectionIsEmpty: return "Collection is empty. Go draw a card!"
         }
     }
     
@@ -125,6 +137,65 @@ enum LocalizedText {
     }
 }
 
+// 提取卡片内容的子视图，以便重用
+struct CardContent: View {
+    var quote: Quote?
+    var universeReply: UniverseReply?
+    var language: Language
+    
+    var body: some View {
+        VStack(spacing: 15) {
+            if let reply = universeReply {
+                switch language {
+                case .chinese:
+                    Text(reply.chinese)
+                        .customFont(size: 24, weight: .heavy)
+                        .padding(.horizontal)
+                case .english:
+                    Text(reply.english)
+                        .customFont(size: 24, weight: .heavy)
+                        .padding(.horizontal)
+                case .bilingual:
+                    VStack(spacing: 15) {
+                        Text(reply.chinese)
+                            .customFont(size: 24, weight: .heavy)
+                        Text(reply.english)
+                            .customFont(size: 20)
+                            .padding(.top, 5)
+                    }
+                    .padding(.horizontal)
+                }
+            } else if let quote = quote {
+                switch language {
+                case .chinese:
+                    Text(quote.chinese)
+                        .customFont(size: 24, weight: .heavy)
+                        .fontWeight(.bold)
+                        .padding(.horizontal)
+                case .english:
+                    Text(quote.english)
+                        .customFont(size: 24, weight: .heavy)
+                        .fontWeight(.bold)
+                        .padding(.horizontal)
+                case .bilingual:
+                    VStack(spacing: 15) {
+                        Text(quote.chinese)
+                            .customFont(size: 24, weight: .heavy)
+                            .fontWeight(.bold)
+                        Text(quote.english)
+                            .customFont(size: 20)
+                            .padding(.top, 5)
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+        .foregroundColor(.black)
+        .multilineTextAlignment(.center)
+        .frame(width: 300, height: 200)
+    }
+}
+
 struct ContentView: View {
 //    let colors = ["#c1cbd7", "#afb0b2", "#939391", "#bfbfbf", "#e0e5df"]
     
@@ -136,6 +207,7 @@ struct ContentView: View {
     @State private var backgroundColor: Color = Color(hex: "#c1cbd7")
     @State private var currentQuote: Quote?
     @State private var universeReply: UniverseReply?
+    @State private var isSaved: Bool = false
     
     @State private var selectedLanguage: Language = {
         if let savedLanguageRawValue = UserDefaults.standard.string(forKey: "selectedLanguage"),
@@ -154,12 +226,12 @@ struct ContentView: View {
     @State private var showPrompt: Bool = false
     @State private var showButton: Bool = false
     @State private var showSettings: Bool = false
+    @State private var showCollection: Bool = false
     
     @State private var cardOpacity: Double = 1.0
     @State private var cardOffset: CGSize = .zero
     @State private var cardScale: CGFloat = 1.0
     
-    // MARK: - Change [1/4]: Renamed for clarity, true shows reply, false shows original quote.
     @State private var cardRotation: Double = 0
     @State private var showReplyCard: Bool = true
     
@@ -176,7 +248,6 @@ struct ContentView: View {
         } else {
             print("Could not find quotes.json in main bundle.")
             self.currentQuote = Quote(chinese: LocalizedText.fileNotFound.chinese, english: LocalizedText.fileNotFound.english)
-            
         }
     }
     
@@ -212,10 +283,14 @@ struct ContentView: View {
                         if let savedReplyData = UserDefaults.standard.data(forKey: "universeReply"),
                            let savedReply = try? JSONDecoder().decode(UniverseReply.self, from: savedReplyData) {
                             self.universeReply = savedReply
+                            self.cardRotation = 0
+                        } else {
+                            self.cardRotation = 0
                         }
                     } else {
                         self.viewState = .content
                     }
+                    isSaved = checkIfCardIsSaved(quote: savedQuote)
                 } else {
                     startInitialAnimation()
                 }
@@ -248,6 +323,7 @@ struct ContentView: View {
         self.cardRotation = 0
         // MARK: - Change [2/4]: Reset flip state
         self.showReplyCard = true
+        self.isSaved = false
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             withAnimation { showTitle = true }
@@ -271,268 +347,285 @@ struct ContentView: View {
         startInitialAnimation()
     }
     
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-
-                // MARK: - 背景渐变
-                RadialGradient(
-                    gradient: Gradient(colors: [backgroundColor1, backgroundEndColor]),
-                    center: .topLeading,
-                    startRadius: 10,
-                    endRadius: 500
-                )
-                .ignoresSafeArea()
-
-                RadialGradient(
-                    gradient: Gradient(colors: [backgroundColor2, backgroundEndColor]),
-                    center: .bottomTrailing,
-                    startRadius: 10,
-                    endRadius: 500
-                )
-                .ignoresSafeArea()
-                
-                // MARK: - 初始屏幕
-                VStack(spacing: 30) {
-                    Text(LocalizedText.dailyAffirmationTitle.localizedString(for: selectedLanguage))
-                        .customFont(size: 36, weight: .heavy)
-                        .scaleEffect(showTitle ? 1.0 : 0.8)
-                        .opacity(showTitle ? 1 : 0)
-                        .animation(.easeOut(duration: 0.8), value: showTitle)
-                    
-                    Text(LocalizedText.dailyAffirmationPrompt.localizedString(for: selectedLanguage))
-                        .customFont(size: 20)
-                        .scaleEffect(showPrompt ? 1.0 : 0.8)
-                        .opacity(showPrompt ? 1 : 0)
-                        .animation(.easeOut(duration: 0.8).delay(0.4), value: showPrompt)
-                    
-                    Button(action: {
-                        loadQuotes()
-                        currentQuote?.sentToUniverse = false
-                        saveDailyAffirmation()
-                        
-                        withAnimation(.easeOut(duration: 0.4)) {
-                            showTitle = false
-                            showPrompt = false
-                            showButton = false
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            withAnimation(.easeOut(duration: 0.8)) {
-                                viewState = .content
-                            }
-                        }
-                    }) {
-                        Text(LocalizedText.drawButton.localizedString(for: selectedLanguage))
-                            .customFont(size: 24, weight: .heavy)
-                            .foregroundColor(.white)
-                            .frame(width: 100, height: 100)
-                            .background(Color.black.opacity(0.8))
-                            .clipShape(Circle())
-                    }
-                    .opacity(showButton ? 1 : 0)
-                    .animation(.easeOut(duration: 0.8).delay(0.8), value: showButton)
-                    .disabled(viewState != .initial)
+    private func saveCurrentCard() {
+        guard let quote = currentQuote else { return }
+        
+        if let savedData = UserDefaults.standard.data(forKey: "savedCards"),
+           var savedCards = try? JSONDecoder().decode([SavedCard].self, from: savedData) {
+            
+            // 检查是否已经收藏过
+            if !savedCards.contains(where: { $0.quote.chinese == quote.chinese }) {
+                let newCard = SavedCard(date: Date(), quote: quote, universeReply: universeReply)
+                savedCards.append(newCard)
+                if let encoded = try? JSONEncoder().encode(savedCards) {
+                    UserDefaults.standard.set(encoded, forKey: "savedCards")
+                    isSaved = true
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .opacity(viewState == .initial ? 1 : 0)
-                
-                // MARK: - 主要内容屏幕
-                if viewState == .content {
-                    VStack(spacing: 20) {
-                        VStack(spacing: 15) {
-                            if let quote = currentQuote {
-                                switch selectedLanguage {
-                                case .chinese:
-                                    Text(quote.chinese)
-                                        .customFont(size: 24, weight: .heavy)
-                                        .padding(.horizontal)
-                                case .english:
-                                    Text(quote.english)
-                                        .customFont(size: 24, weight: .heavy)
-                                        .padding(.horizontal)
-                                case .bilingual:
-                                    VStack(spacing: 15) {
-                                        Text(quote.chinese)
-                                            .customFont(size: 24, weight: .heavy)
-                                        Text(quote.english)
-                                            .customFont(size: 20)
-                                            .padding(.top, 5)
-                                    }
-                                    .padding(.horizontal)
-                                }
-                            } else {
-                                Text(LocalizedText.loading.localizedString(for: selectedLanguage))
-                                    .customFont(size: 24)
-                                    .fontWeight(.heavy)
-                                    .padding(.horizontal)
-                            }
-                        }
-                        .foregroundColor(.black)
-                        .multilineTextAlignment(.center)
-                        .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
-                        .background(Color.white.opacity(cardOpacity))
-//                        .cornerRadius(15)
-                        .shadow(radius: 5)
-                        .offset(cardOffset)
-                        .scaleEffect(cardScale)
+            }
+        } else {
+            // 第一次收藏
+            let newCard = SavedCard(date: Date(), quote: quote, universeReply: universeReply)
+            if let encoded = try? JSONEncoder().encode([newCard]) {
+                UserDefaults.standard.set(encoded, forKey: "savedCards")
+                isSaved = true
+            }
+        }
+    }
+    
+    private func checkIfCardIsSaved(quote: Quote) -> Bool {
+        if let savedData = UserDefaults.standard.data(forKey: "savedCards"),
+           let savedCards = try? JSONDecoder().decode([SavedCard].self, from: savedData) {
+            return savedCards.contains(where: { $0.quote.chinese == quote.chinese })
+        }
+        return false
+    }
+    
+    var body: some View {
+        NavigationView {
+            GeometryReader { geometry in
+                ZStack {
+                    // MARK: - 背景渐变
+                    RadialGradient(
+                        gradient: Gradient(colors: [backgroundColor1, backgroundEndColor]),
+                        center: .topLeading,
+                        startRadius: 10,
+                        endRadius: 500
+                    )
+                    .ignoresSafeArea()
+                    
+                    RadialGradient(
+                        gradient: Gradient(colors: [backgroundColor2, backgroundEndColor]),
+                        center: .bottomTrailing,
+                        startRadius: 10,
+                        endRadius: 500
+                    )
+                    .ignoresSafeArea()
+                    
+                    // MARK: - 初始屏幕
+                    VStack(spacing: 30) {
+                        Text(LocalizedText.dailyAffirmationTitle.localizedString(for: selectedLanguage))
+                            .customFont(size: 36, weight: .heavy)
+                            .scaleEffect(showTitle ? 1.0 : 0.8)
+                            .opacity(showTitle ? 1 : 0)
+                            .animation(.easeOut(duration: 0.8), value: showTitle)
+                        
+                        Text(LocalizedText.dailyAffirmationPrompt.localizedString(for: selectedLanguage))
+                            .customFont(size: 20)
+                            .scaleEffect(showPrompt ? 1.0 : 0.8)
+                            .opacity(showPrompt ? 1 : 0)
+                            .animation(.easeOut(duration: 0.8).delay(0.4), value: showPrompt)
                         
                         Button(action: {
-                            withAnimation(.easeOut(duration: 0.8)) {
-                                cardOffset = CGSize(width: 0, height: -geometry.size.height * 0.7)
-                                cardOpacity = 0.0
-                                cardScale = 0.5
-                            }
+                            loadQuotes()
+                            currentQuote?.sentToUniverse = false
+                            saveDailyAffirmation()
                             
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                                currentQuote?.sentToUniverse = true
-                                
-                                if Int.random(in: 1...100) <= 50 {
-                                    self.universeReply = loadUniverseReply()
-                                }
-                                saveDailyAffirmation()
-                                
-                                withAnimation(.easeIn(duration: 0.8)) {
-                                    viewState = .universeReceived
+                            withAnimation(.easeOut(duration: 0.4)) {
+                                showTitle = false
+                                showPrompt = false
+                                showButton = false
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                withAnimation(.easeOut(duration: 0.8)) {
+                                    viewState = .content
                                 }
                             }
                         }) {
-                            Text(LocalizedText.sendToUniverse.localizedString(for: selectedLanguage))
-                                .customFont(size: 20)
+                            Text(LocalizedText.drawButton.localizedString(for: selectedLanguage))
+                                .customFont(size: 24, weight: .heavy)
                                 .foregroundColor(.white)
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 20)
-                                .background(Color(hex: "#7b8b6f"))
-//                                .cornerRadius(10)
+                                .frame(width: 100, height: 100)
+                                .background(Color.black.opacity(0.8))
+                                .clipShape(Circle())
                         }
-                        .transition(.opacity)
+                        .opacity(showButton ? 1 : 0)
+                        .animation(.easeOut(duration: 0.8).delay(0.8), value: showButton)
+                        .disabled(viewState != .initial)
                     }
-                    .opacity(viewState == .content ? 1 : 0)
-                    .animation(.easeIn(duration: 0.8), value: viewState)
-                }
-                
-                // MARK: - 宇宙已收到页面 (可翻转卡片)
-                if viewState == .universeReceived {
-                    VStack(spacing: 20) {
-                        // MARK: - Change [3/4]: Logic to show correct title
-                        Text(showReplyCard && universeReply != nil ? LocalizedText.universeReplyReceived.localizedString(for: selectedLanguage) : LocalizedText.universeReceivedCard.localizedString(for: selectedLanguage))
-                            .customFont(size: 20)
-                            .fontWeight(.bold)
-                            .opacity(currentQuote?.sentToUniverse ?? false ? 1 : 0)
-                        
-                        // MARK: - Change [4/4]: Major logic change for flipping
-                        if universeReply != nil {
-                            ZStack {
-                                // 原始卡片 (反面)
-                                VStack(spacing: 15) {
-                                    if let quote = currentQuote {
-                                        switch selectedLanguage {
-                                        case .chinese:
-                                            Text(quote.chinese).customFont(size: 24, weight: .heavy).padding(.horizontal)
-                                        case .english:
-                                            Text(quote.english).customFont(size: 24, weight: .heavy).padding(.horizontal)
-                                        case .bilingual:
-                                            VStack(spacing: 15) {
-                                                Text(quote.chinese).customFont(size: 24, weight: .heavy)
-                                                Text(quote.english).customFont(size: 20).padding(.top, 5)
-                                            }.padding(.horizontal)
-                                        }
-                                    }
-                                }
-                                .foregroundColor(.black)
-                                .multilineTextAlignment(.center)
-                                .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
-                                .background(Color.white.opacity(0.4))
-//                                .cornerRadius(15)
-                                .shadow(radius: 5)
-                                .rotation3DEffect(.degrees(cardRotation - 180), axis: (x: 0, y: 1, z: 0))
-                                .opacity(showReplyCard ? 0 : 1)
-                                
-                                // 宇宙回信卡片 (正面)
-                                VStack(spacing: 15) {
-                                    Text(universeReply?.chinese ?? "").customFont(size: 24, weight: .heavy).padding(.horizontal)
-                                    Text(universeReply?.english ?? "").customFont(size: 20).padding(.top, 5).padding(.horizontal)
-                                }
-                                .foregroundColor(.black)
-                                .multilineTextAlignment(.center)
-                                .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
-                                .background(Color.yellow.opacity(0.8))
-//                                .cornerRadius(15)
-                                .shadow(radius: 5)
-                                .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0))
-                                .opacity(showReplyCard ? 1 : 0)
-                            }
-                            .onTapGesture {
-                                withAnimation(.easeInOut(duration: 0.6)) {
-                                    cardRotation += 180
-                                    showReplyCard.toggle()
-                                }
-                            }
-                        } else {
-                            // If no reply, just show the original card statically
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .opacity(viewState == .initial ? 1 : 0)
+                    
+                    // MARK: - 主要内容屏幕
+                    if viewState == .content {
+                        VStack(spacing: 20) {
                             VStack(spacing: 15) {
                                 if let quote = currentQuote {
                                     switch selectedLanguage {
                                     case .chinese:
-                                        Text(quote.chinese).customFont(size: 24, weight: .heavy).padding(.horizontal)
+                                        Text(quote.chinese)
+                                            .customFont(size: 24, weight: .heavy)
+                                            .padding(.horizontal)
                                     case .english:
-                                        Text(quote.english).customFont(size: 24, weight: .heavy).padding(.horizontal)
+                                        Text(quote.english)
+                                            .customFont(size: 24, weight: .heavy)
+                                            .padding(.horizontal)
                                     case .bilingual:
                                         VStack(spacing: 15) {
-                                            Text(quote.chinese).customFont(size: 24, weight: .heavy)
-                                            Text(quote.english).customFont(size: 20).padding(.top, 5)
-                                        }.padding(.horizontal)
+                                            Text(quote.chinese)
+                                                .customFont(size: 24, weight: .heavy)
+                                            Text(quote.english)
+                                                .customFont(size: 20)
+                                                .padding(.top, 5)
+                                        }
+                                        .padding(.horizontal)
                                     }
+                                } else {
+                                    Text(LocalizedText.loading.localizedString(for: selectedLanguage))
+                                        .customFont(size: 24)
+                                        .fontWeight(.heavy)
+                                        .padding(.horizontal)
                                 }
                             }
                             .foregroundColor(.black)
                             .multilineTextAlignment(.center)
                             .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
-                            .background(Color.white.opacity(0.4))
-//                            .cornerRadius(15)
+                            .background(Color.white.opacity(cardOpacity))
+                            .cornerRadius(15)
                             .shadow(radius: 5)
+                            .offset(cardOffset)
+                            .scaleEffect(cardScale)
+                            
+                            Button(action: {
+                                withAnimation(.easeOut(duration: 0.8)) {
+                                    cardOffset = CGSize(width: 0, height: -geometry.size.height * 0.7)
+                                    cardOpacity = 0.0
+                                    cardScale = 0.5
+                                }
+                                
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                                    currentQuote?.sentToUniverse = true
+                                    
+                                    if Int.random(in: 1...100) <= 20 {
+                                        self.universeReply = loadUniverseReply()
+                                    }
+                                    saveDailyAffirmation()
+                                    isSaved = checkIfCardIsSaved(quote: currentQuote!)
+                                    
+                                    withAnimation(.easeIn(duration: 0.8)) {
+                                        viewState = .universeReceived
+                                    }
+                                }
+                            }) {
+                                Text(LocalizedText.sendToUniverse.chinese)
+                                    .customFont(size: 20)
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 10)
+                                    .padding(.horizontal, 20)
+                                    .background(Color(hex: "#7b8b6f"))
+                            }
+                            .transition(.opacity)
                         }
-                        
-                        Text(LocalizedText.universeReceivedMessage.localizedString(for: selectedLanguage))
-                            .customFont(size: 20)
-                            .multilineTextAlignment(.center)
-                            .padding(.top, 10)
+                        .opacity(viewState == .content ? 1 : 0)
+                        .animation(.easeIn(duration: 0.8), value: viewState)
                     }
-                    .opacity(viewState == .universeReceived ? 1 : 0)
-                    .animation(.easeIn(duration: 0.8), value: viewState)
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                HStack {
-//                    if viewState == .content || viewState == .universeReceived {
-//                        Picker("", selection: $selectedLanguage) {
-//                            ForEach(Language.allCases, id: \.self) { language in
-//                                Text(language.rawValue).tag(language)
-//                            }
-//                        }
-//                        .pickerStyle(.menu)
-//                        .padding(.top, geometry.safeAreaInsets.top)
-//                    }
                     
-                    Button(action: {
-                        showSettings.toggle()
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                            .customFont(size: 20)
-                            .foregroundColor(.black)
-                            .padding(.top, geometry.safeAreaInsets.top)
+                    // MARK: - 宇宙已收到页面 (可翻转卡片)
+                    if viewState == .universeReceived {
+                        VStack(spacing: 20) {
+                            Text(showReplyCard && universeReply != nil ? LocalizedText.universeReplyReceived.chinese : LocalizedText.universeReceivedCard.chinese)
+                                .customFont(size: 24, weight: .heavy)
+                            
+                            ZStack {
+                                // 原始卡片 (反面)
+                                CardContent(quote: currentQuote, language: selectedLanguage)
+                                    .background(Color(hex: "#e0e5df"))
+                                    // .cornerRadius(15)
+                                    .shadow(radius: 5)
+                                    .rotation3DEffect(.degrees(cardRotation + 180), axis: (x: 0, y: 1, z: 0))
+                                    .opacity(cardRotation > 90 ? 1 : 0)
+                                
+                                // 宇宙回信卡片 (正面)
+                                if universeReply != nil {
+                                    CardContent(universeReply: universeReply, language: selectedLanguage)
+                                        .background(Color.yellow)
+                                        .cornerRadius(15)
+                                        .shadow(radius: 5)
+                                        .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0))
+                                        .opacity(cardRotation <= 90 ? 1 : 0)
+                                } else {
+                                    CardContent(quote: currentQuote, language: selectedLanguage)
+                                        .background(Color(hex: "#e0e5df"))
+                                        .cornerRadius(15)
+                                        .shadow(radius: 5)
+                                }
+                            }
+                            .frame(width: geometry.size.width * 0.8, height: geometry.size.height * 0.5)
+                            .onTapGesture {
+                                if universeReply != nil {
+                                    withAnimation(.easeInOut(duration: 0.6)) {
+                                        cardRotation = cardRotation == 0 ? 180 : 0
+                                    showReplyCard.toggle()
+                                    }
+                                }
+                            }
+                            
+                            Text(LocalizedText.universeReceivedMessage.chinese)
+                                .customFont(size: 20)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 10)
+                            
+                            Button(action: {
+                                saveCurrentCard()
+                            }) {
+                                Image(systemName: isSaved ? "heart.fill" : "heart")
+                                    .customFont(size: 24)
+                                    .foregroundColor(isSaved ? .red : .gray)
+                            }
+                            .disabled(isSaved)
+                        }
+                        .opacity(viewState == .universeReceived ? 1 : 0)
+                        .animation(.easeIn(duration: 0.8), value: viewState)
                     }
-                    .padding(.trailing, 20)
                 }
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView(selectedLanguage: $selectedLanguage, resetAction: resetUserDefaults)
-            }
-            .onAppear {
-
-                getDailyAffirmation()
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        HStack {
+                            // if viewState == .content || viewState == .universeReceived {
+                            //     Picker("", selection: $selectedLanguage) {
+                            //         ForEach(Language.allCases, id: \.self) { language in
+                            //             Text(language.rawValue).tag(language)
+                            //                 .customFont(size: 16)
+                            //         }
+                            //     }
+                            //     .pickerStyle(.menu)
+                            // }
+                            
+                            Button(action: {
+                                showCollection.toggle()
+                            }) {
+                                Image(systemName: "heart.rectangle.fill")
+                                    .customFont(size: 20)
+                                    .foregroundColor(.black)
+                            }
+                            .padding(.trailing, 10)
+                            
+                            Button(action: {
+                                showSettings.toggle()
+                            }) {
+                                Image(systemName: "gearshape.fill")
+                                    .customFont(size: 20)
+                                    .foregroundColor(.black)
+                            }
+                        }
+                    }
+                }
+                .sheet(isPresented: $showSettings) {
+                    SettingsView(selectedLanguage: $selectedLanguage, resetAction: resetUserDefaults)
+                }
+                .sheet(isPresented: $showCollection) {
+                    CollectionListView(selectedLanguage: $selectedLanguage)
+                }
+                .onAppear {
+                    getDailyAffirmation()
+                }
             }
         }
     }
+}
+
+
+#Preview {
+    ContentView()
 }
 
 #Preview {

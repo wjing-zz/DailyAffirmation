@@ -33,11 +33,12 @@ struct SettingsView: View {
                 .foregroundColor(.white)
 //                .cornerRadius(10)
                 
-                // 重置按钮
-                Button(LocalizedText.resetAppData.localizedString(for: selectedLanguage)) {
-                    resetAction()
-                    dismiss()
-                }
+                // // 重置按钮
+                // Button(LocalizedText.resetAppData.localizedString(for: selectedLanguage)) {
+                //     resetAction()
+                //     dismiss()
+                // }
+
                 .padding()
                 .background(Color.black) // 修改为黑色
                 .foregroundColor(.white)

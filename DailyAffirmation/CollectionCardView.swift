@@ -8,7 +8,7 @@ struct CollectionCardView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            Text(cardRotation == 0 ? LocalizedText.universeReplyReceived.localizedString(for: selectedLanguage) : LocalizedText.universeReceivedCard.localizedString(for: selectedLanguage))
+            Text(cardRotation == 0 && savedCard.universeReply != nil ? LocalizedText.universeReplyReceived.localizedString(for: selectedLanguage) : LocalizedText.universeReceivedCard.localizedString(for: selectedLanguage))
                 .customFont(size: 24, weight: .heavy)
             
             ZStack {
